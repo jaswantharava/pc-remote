@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Deckboard Remote Controller</title>
+  <style>
+    :root {
+      --bg-color: #0d1117;
+      --card-bg: #161b22;
+      --card-border: #30363d;
+      --accent-red: #ff0000;
+      --accent-blue: #0088ff;
+      --accent-purple: #8b5cf6;
+      --text-main: #f0f6fc;
+      --text-sub: #8b949e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    
+    body {
+      background: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 12px;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    /* Top Connection Bar */
+    .header {
+      display: flex;
+      gap: 8px;
+      background: var(--card-bg);
+      padding: 8px;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+    }
+
+    .header input {
+      flex: 1;
+      background: #090d11;
+      border: 1px solid var(--card-border);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .btn-connect {
+      background: var(--accent-blue);
+      border: none;
+      color: white;
+      font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* Deck Switcher Tabs */
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-sub);
+      padding: 10px 0;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: #21262d;
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 10px rgba(0, 136, 255, 0.2);
+    }
+
+    /* Tab Content Views */
+    .deck-container {
+      flex: 1;
+      display: none;
+      overflow-y: auto;
+    }
+
+    .deck-container.active {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Stream Deck Tile Grid Layout */
+    .deck-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    /* Deckboard Button Tile Styling */
+    .deck-tile {
+      background: linear-gradient(145deg, #1c2128, #161b22);
+      border: 1px solid var(--card-border);
+      border-bottom: 3px solid #090d11;
+      border-radius: 12px;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.08s ease;
+      position: relative;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .deck-tile:active {
+      transform: translateY(2px);
+      border-bottom-width: 1px;
+      background: #21262d;
+      box-shadow: 0 0 12px rgba(255, 0, 0, 0.4);
+    }
+
+    .deck-tile .icon {
+      font-size: 1.4rem;
+    }
+
+    .deck-tile .label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--text-sub);
+      text-align: center;
+    }
+
+    /* Color Variants */
+    .tile-yt { border-top: 2px solid var(--accent-red); }
+    .tile-yt .icon { color: var(--accent-red); }
+
+    .tile-mode { border-top: 2px solid var(--accent-purple); }
+    .tile-mode .icon { color: var(--accent-purple); }
+
+    .tile-audio { border-top: 2px solid var(--accent-blue); }
+    .tile-audio .icon { color: var(--accent-blue); }
+
+    /* Trackpad Interface */
+    #touchpad {
+      flex: 1;
+      background: var(--card-bg);
+      border: 2px dashed var(--card-border);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-sub);
+      font-weight: 600;
+      touch-action: none;
+    }
+
+    .mouse-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .btn-mouse {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 14px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    /* Keyboard Input Section */
+    .input-bar {
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-bar input {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      padding: 10px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Server Connection -->
+  <div class="header">
+    <input type="text" id="serverIp" placeholder="PC IP Address (e.g. 192.168.1.5)">
+    <button class="btn-connect" onclick="connectWS()">Connect</button>
+  </div>
+
+  <!-- Deck Navigation Tabs -->
+  <div class="tab-bar">
+    <div class="tab-btn active" onclick="switchTab('yt-deck', this)">YouTube Deck</div>
+    <div class="tab-btn" onclick="switchTab('reels-deck', this)">Shorts / Reels</div>
+    <div class="tab-btn" onclick="switchTab('mouse-deck', this)">Trackpad</div>
+  </div>
+
+  <!-- DECK 1: YOUTUBE FULL CONTROLS -->
+  <div id="yt-deck" class="deck-container active">
+    <div class="deck-grid">
+
+      <!-- Row 1: Primary Controls -->
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_play_pause')">
+        <span class="icon">⏯</span>
+        <span class="label">Play / Pause</span>
+      </div>
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_back_10')">
+        <span class="icon">⏪</span>
+        <span class="label">-10s Sec</span>
+      </div>
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_fwd_10')">
+        <span class="icon">⏩</span>
+        <span class="label">+10s Sec</span>
+      </div>
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_next_video')">
+        <span class="icon">⏭</span>
+        <span class="label">Next Video</span>
+      </div>
+
+      <!-- Row 2: Precision Seeking & Frame Stepping -->
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_back_5')">
+        <span class="icon">◀</span>
+        <span class="label">-5s Sec</span>
+      </div>
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_fwd_5')">
+        <span class="icon">▶</span>
+        <span class="label">+5s Sec</span>
+      </div>
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_frame_back')">
+        <span class="icon">❮</span>
+        <span class="label">Frame -1</span>
+      </div>
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_frame_fwd')">
+        <span class="icon">❯</span>
+        <span class="label">Frame +1</span>
+      </div>
+
+      <!-- Row 3: Speed & Audio -->
+      <div class="deck-tile tile-audio" onclick="sendMacro('yt_speed_down')">
+        <span class="icon">🐢</span>
+        <span class="label">Speed -</span>
+      </div>
+      <div class="deck-tile tile-audio" onclick="sendMacro('yt_speed_up')">
+        <span class="icon">🚀</span>
+        <span class="label">Speed +</span>
+      </div>
+      <div class="deck-tile tile-audio" onclick="sendMacro('vol_up')">
+        <span class="icon">🔊</span>
+        <span class="label">Vol +</span>
+      </div>
+      <div class="deck-tile tile-audio" onclick="sendMacro('vol_down')">
+        <span class="icon">🔉</span>
+        <span class="label">Vol -</span>
+      </div>
+
+      <!-- Row 4: View Modes & Subtitles -->
+      <div class="deck-tile tile-mode" onclick="sendMacro('yt_fullscreen')">
+        <span class="icon">⛶</span>
+        <span class="label">Full Screen</span>
+      </div>
+      <div class="deck-tile tile-mode" onclick="sendMacro('yt_theater')">
+        <span class="icon">🎬</span>
+        <span class="label">Theater</span>
+      </div>
+      <div class="deck-tile tile-mode" onclick="sendMacro('yt_miniplayer')">
+        <span class="icon">🖼</span>
+        <span class="label">Mini Player</span>
+      </div>
+      <div class="deck-tile tile-mode" onclick="sendMacro('yt_captions')">
+        <span class="icon">💬</span>
+        <span class="label">Captions (CC)</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DECK 2: SHORTS / REELS DECK -->
+  <div id="reels-deck" class="deck-container">
+    <div class="deck-grid">
+      <div class="deck-tile tile-mode" onclick="sendMacro('reels_prev')">
+        <span class="icon">⬆</span>
+        <span class="label">Prev Reel</span>
+      </div>
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_like')">
+        <span class="icon">❤️</span>
+        <span class="label">Like</span>
+      </div>
+      <div class="deck-tile tile-mode" onclick="sendMacro('reels_next')">
+        <span class="icon">⬇</span>
+        <span class="label">Next Reel</span>
+      </div>
+      <div class="deck-tile tile-audio" onclick="sendMacro('mute')">
+        <span class="icon">🔇</span>
+        <span class="label">Mute</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DECK 3: MOUSE TOUCHPAD & KEYBOARD -->
+  <div id="mouse-deck" class="deck-container">
+    <div id="touchpad">Slide finger to navigate mouse</div>
+    <div class="mouse-actions">
+      <button class="btn-mouse" onclick="sendClick('left')">Left Click</button>
+      <button class="btn-mouse" onclick="sendClick('right')">Right Click</button>
+    </div>
+    <div class="input-bar">
+      <input type="text" id="textInput" placeholder="Type text to PC...">
+      <button class="btn-connect" onclick="sendText()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+
+    function connectWS() {
+      const ip = document.getElementById('serverIp').value.trim();
+      if (!ip) {
+        alert("Please enter your PC's IP address.");
+        return;
+      }
+      ws = new WebSocket(`ws://${ip}:8765`);
+
+      ws.onopen = () => alert("Connected to PC Remote Server!");
+      ws.onerror = () => alert("Unable to connect. Check server script and IP.");
+    }
+
+    function send(data) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(data));
+      }
+    }
+
+    function sendMacro(action) {
+      send({ type: 'macro', action: action });
+      if (navigator.vibrate) navigator.vibrate(30); // Tactile feedback
+    }
+
+    function sendClick(button) { send({ type: 'mouse_click', button: button }); }
+    
+    function sendText() {
+      const input = document.getElementById('textInput');
+      send({ type: 'type_text', text: input.value });
+      input.value = '';
+    }
+
+    function switchTab(tabId, el) {
+      document.querySelectorAll('.deck-container').forEach(d => d.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      el.classList.add('active');
+    }
+
+    // Touchpad Gesture Tracking
+    const pad = document.getElementById('touchpad');
+    let lastX = 0, lastY = 0;
+
+    pad.addEventListener('touchstart', (e) => {
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
+    });
+
+    pad.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      const dx = touch.clientX - lastX;
+      const dy = touch.clientY - lastY;
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+
+      send({ type: 'mouse_move', dx: dx, dy: dy });
+    });
+  </script>
+</body>
+</html>

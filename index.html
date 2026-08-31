@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Deckboard Remote Controller</title>
+  <title>Deckboard Pro Controller</title>
   <style>
     :root {
       --bg-color: #0d1117;
@@ -12,6 +12,7 @@
       --accent-red: #ff0000;
       --accent-blue: #0088ff;
       --accent-purple: #8b5cf6;
+      --accent-green: #238636;
       --text-main: #f0f6fc;
       --text-sub: #8b949e;
     }
@@ -37,6 +38,7 @@
       padding: 8px;
       border-radius: 10px;
       border: 1px solid var(--card-border);
+      align-items: center;
     }
 
     .header input {
@@ -49,12 +51,21 @@
       font-size: 0.9rem;
     }
 
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ef4444; /* Default disconnected */
+    }
+
+    .status-dot.connected { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+
     .btn-connect {
       background: var(--accent-blue);
       border: none;
       color: white;
       font-weight: 700;
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 6px;
       cursor: pointer;
     }
@@ -73,7 +84,7 @@
       padding: 10px 0;
       border-radius: 8px;
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       text-align: center;
       cursor: pointer;
     }
@@ -119,7 +130,6 @@
       gap: 6px;
       cursor: pointer;
       transition: all 0.08s ease;
-      position: relative;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
 
@@ -127,25 +137,17 @@
       transform: translateY(2px);
       border-bottom-width: 1px;
       background: #21262d;
-      box-shadow: 0 0 12px rgba(255, 0, 0, 0.4);
     }
 
-    .deck-tile .icon {
-      font-size: 1.4rem;
-    }
+    .deck-tile .icon { font-size: 1.3rem; }
+    .deck-tile .label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-sub); text-align: center; }
 
-    .deck-tile .label {
-      font-size: 0.68rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      color: var(--text-sub);
-      text-align: center;
-    }
-
-    /* Color Variants */
+    /* Category Themes */
     .tile-yt { border-top: 2px solid var(--accent-red); }
     .tile-yt .icon { color: var(--accent-red); }
+
+    .tile-key { border-top: 2px solid var(--accent-green); }
+    .tile-key .icon { color: var(--accent-green); }
 
     .tile-mode { border-top: 2px solid var(--accent-purple); }
     .tile-mode .icon { color: var(--accent-purple); }
@@ -153,7 +155,7 @@
     .tile-audio { border-top: 2px solid var(--accent-blue); }
     .tile-audio .icon { color: var(--accent-blue); }
 
-    /* Trackpad Interface */
+    /* Smooth Trackpad Area */
     #touchpad {
       flex: 1;
       background: var(--card-bg);
@@ -165,6 +167,7 @@
       color: var(--text-sub);
       font-weight: 600;
       touch-action: none;
+      min-height: 220px;
     }
 
     .mouse-actions {
@@ -182,85 +185,67 @@
       font-weight: 700;
     }
 
-    /* Keyboard Input Section */
-    .input-bar {
+    /* Keyboard Deck Styling */
+    .text-input-group {
       display: flex;
       gap: 8px;
     }
 
-    .input-bar input {
+    .text-input-group input {
       flex: 1;
-      background: var(--card-bg);
+      background: #090d11;
       border: 1px solid var(--card-border);
       color: #fff;
-      padding: 10px;
+      padding: 12px;
       border-radius: 8px;
+      font-size: 1rem;
     }
   </style>
 </head>
 <body>
 
-  <!-- Server Connection -->
+  <!-- Connection Header -->
   <div class="header">
+    <div id="statusDot" class="status-dot"></div>
     <input type="text" id="serverIp" placeholder="PC IP Address (e.g. 192.168.1.5)">
     <button class="btn-connect" onclick="connectWS()">Connect</button>
   </div>
 
   <!-- Deck Navigation Tabs -->
   <div class="tab-bar">
-    <div class="tab-btn active" onclick="switchTab('yt-deck', this)">YouTube Deck</div>
-    <div class="tab-btn" onclick="switchTab('reels-deck', this)">Shorts / Reels</div>
+    <div class="tab-btn active" onclick="switchTab('yt-deck', this)">YouTube</div>
+    <div class="tab-btn" onclick="switchTab('key-deck', this)">Keyboard</div>
+    <div class="tab-btn" onclick="switchTab('reels-deck', this)">Shorts/Reels</div>
     <div class="tab-btn" onclick="switchTab('mouse-deck', this)">Trackpad</div>
   </div>
 
-  <!-- DECK 1: YOUTUBE FULL CONTROLS -->
+  <!-- TAB 1: YOUTUBE CONTROLS -->
   <div id="yt-deck" class="deck-container active">
     <div class="deck-grid">
-
-      <!-- Row 1: Primary Controls -->
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_play_pause')">
         <span class="icon">⏯</span>
         <span class="label">Play / Pause</span>
       </div>
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_back_10')">
         <span class="icon">⏪</span>
-        <span class="label">-10s Sec</span>
+        <span class="label">-10 Sec</span>
       </div>
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_fwd_10')">
         <span class="icon">⏩</span>
-        <span class="label">+10s Sec</span>
+        <span class="label">+10 Sec</span>
       </div>
-      <div class="deck-tile tile-yt" onclick="sendMacro('yt_next_video')">
-        <span class="icon">⏭</span>
-        <span class="label">Next Video</span>
+      <div class="deck-tile tile-mode" onclick="sendMacro('yt_fullscreen')">
+        <span class="icon">⛶</span>
+        <span class="label">Fullscreen</span>
       </div>
 
-      <!-- Row 2: Precision Seeking & Frame Stepping -->
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_back_5')">
         <span class="icon">◀</span>
-        <span class="label">-5s Sec</span>
+        <span class="label">-5 Sec</span>
       </div>
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_fwd_5')">
         <span class="icon">▶</span>
-        <span class="label">+5s Sec</span>
-      </div>
-      <div class="deck-tile tile-yt" onclick="sendMacro('yt_frame_back')">
-        <span class="icon">❮</span>
-        <span class="label">Frame -1</span>
-      </div>
-      <div class="deck-tile tile-yt" onclick="sendMacro('yt_frame_fwd')">
-        <span class="icon">❯</span>
-        <span class="label">Frame +1</span>
-      </div>
-
-      <!-- Row 3: Speed & Audio -->
-      <div class="deck-tile tile-audio" onclick="sendMacro('yt_speed_down')">
-        <span class="icon">🐢</span>
-        <span class="label">Speed -</span>
-      </div>
-      <div class="deck-tile tile-audio" onclick="sendMacro('yt_speed_up')">
-        <span class="icon">🚀</span>
-        <span class="label">Speed +</span>
+        <span class="label">+5 Sec</span>
       </div>
       <div class="deck-tile tile-audio" onclick="sendMacro('vol_up')">
         <span class="icon">🔊</span>
@@ -271,28 +256,70 @@
         <span class="label">Vol -</span>
       </div>
 
-      <!-- Row 4: View Modes & Subtitles -->
-      <div class="deck-tile tile-mode" onclick="sendMacro('yt_fullscreen')">
-        <span class="icon">⛶</span>
-        <span class="label">Full Screen</span>
+      <div class="deck-tile tile-audio" onclick="sendMacro('yt_speed_down')">
+        <span class="icon">🐢</span>
+        <span class="label">Speed -</span>
+      </div>
+      <div class="deck-tile tile-audio" onclick="sendMacro('yt_speed_up')">
+        <span class="icon">🚀</span>
+        <span class="label">Speed +</span>
       </div>
       <div class="deck-tile tile-mode" onclick="sendMacro('yt_theater')">
         <span class="icon">🎬</span>
         <span class="label">Theater</span>
       </div>
-      <div class="deck-tile tile-mode" onclick="sendMacro('yt_miniplayer')">
-        <span class="icon">🖼</span>
-        <span class="label">Mini Player</span>
-      </div>
       <div class="deck-tile tile-mode" onclick="sendMacro('yt_captions')">
         <span class="icon">💬</span>
-        <span class="label">Captions (CC)</span>
+        <span class="label">Captions</span>
       </div>
-
     </div>
   </div>
 
-  <!-- DECK 2: SHORTS / REELS DECK -->
+  <!-- TAB 2: KEYBOARD & HOTKEY DECK -->
+  <div id="key-deck" class="deck-container">
+    <div class="text-input-group">
+      <input type="text" id="keyboardText" placeholder="Type text here & press Send...">
+      <button class="btn-connect" style="background: var(--accent-green);" onclick="sendTypedText()">Send</button>
+    </div>
+
+    <div class="deck-grid">
+      <div class="deck-tile tile-key" onclick="sendKeyPress('backspace')">
+        <span class="icon">⌫</span>
+        <span class="label">Backspace</span>
+      </div>
+      <div class="deck-tile tile-key" onclick="sendKeyPress('enter')">
+        <span class="icon">↵</span>
+        <span class="label">Enter</span>
+      </div>
+      <div class="deck-tile tile-key" onclick="sendKeyPress('space')">
+        <span class="icon">␣</span>
+        <span class="label">Space</span>
+      </div>
+      <div class="deck-tile tile-key" onclick="sendKeyPress('escape')">
+        <span class="icon">⎋</span>
+        <span class="label">Esc</span>
+      </div>
+
+      <div class="deck-tile tile-key" onclick="sendHotkey(['ctrl', 'c'])">
+        <span class="icon">📋</span>
+        <span class="label">Copy</span>
+      </div>
+      <div class="deck-tile tile-key" onclick="sendHotkey(['ctrl', 'v'])">
+        <span class="icon">📌</span>
+        <span class="label">Paste</span>
+      </div>
+      <div class="deck-tile tile-key" onclick="sendHotkey(['alt', 'tab'])">
+        <span class="icon">↹</span>
+        <span class="label">Alt + Tab</span>
+      </div>
+      <div class="deck-tile tile-key" onclick="sendKeyPress('win')">
+        <span class="icon">🪟</span>
+        <span class="label">Win Key</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: SHORTS & REELS DECK -->
   <div id="reels-deck" class="deck-container">
     <div class="deck-grid">
       <div class="deck-tile tile-mode" onclick="sendMacro('reels_prev')">
@@ -307,28 +334,25 @@
         <span class="icon">⬇</span>
         <span class="label">Next Reel</span>
       </div>
-      <div class="deck-tile tile-audio" onclick="sendMacro('mute')">
+      <div class="deck-tile tile-audio" onclick="sendKeyPress('m')">
         <span class="icon">🔇</span>
         <span class="label">Mute</span>
       </div>
     </div>
   </div>
 
-  <!-- DECK 3: MOUSE TOUCHPAD & KEYBOARD -->
+  <!-- TAB 4: SMOOTH TRACKPAD -->
   <div id="mouse-deck" class="deck-container">
-    <div id="touchpad">Slide finger to navigate mouse</div>
+    <div id="touchpad">Slide finger to control mouse</div>
     <div class="mouse-actions">
       <button class="btn-mouse" onclick="sendClick('left')">Left Click</button>
       <button class="btn-mouse" onclick="sendClick('right')">Right Click</button>
-    </div>
-    <div class="input-bar">
-      <input type="text" id="textInput" placeholder="Type text to PC...">
-      <button class="btn-connect" onclick="sendText()">Send</button>
     </div>
   </div>
 
   <script>
     let ws = null;
+    let pingInterval = null;
 
     function connectWS() {
       const ip = document.getElementById('serverIp').value.trim();
@@ -336,10 +360,30 @@
         alert("Please enter your PC's IP address.");
         return;
       }
+
+      if (ws) ws.close();
+
       ws = new WebSocket(`ws://${ip}:8765`);
 
-      ws.onopen = () => alert("Connected to PC Remote Server!");
-      ws.onerror = () => alert("Unable to connect. Check server script and IP.");
+      ws.onopen = () => {
+        document.getElementById('statusDot').classList.add('connected');
+        // Heartbeat ping every 10 seconds to stop mobile disconnects
+        clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 10000);
+      };
+
+      ws.onclose = () => {
+        document.getElementById('statusDot').classList.remove('connected');
+        clearInterval(pingInterval);
+      };
+
+      ws.onerror = () => {
+        document.getElementById('statusDot').classList.remove('connected');
+      };
     }
 
     function send(data) {
@@ -348,17 +392,17 @@
       }
     }
 
-    function sendMacro(action) {
-      send({ type: 'macro', action: action });
-      if (navigator.vibrate) navigator.vibrate(30); // Tactile feedback
-    }
-
+    function sendMacro(action) { send({ type: 'macro', action: action }); }
     function sendClick(button) { send({ type: 'mouse_click', button: button }); }
-    
-    function sendText() {
-      const input = document.getElementById('textInput');
-      send({ type: 'type_text', text: input.value });
-      input.value = '';
+    function sendKeyPress(key) { send({ type: 'key_press', key: key }); }
+    function sendHotkey(keys) { send({ type: 'hotkey', keys: keys }); }
+
+    function sendTypedText() {
+      const input = document.getElementById('keyboardText');
+      if (input.value) {
+        send({ type: 'type_text', text: input.value });
+        input.value = '';
+      }
     }
 
     function switchTab(tabId, el) {
@@ -368,14 +412,14 @@
       el.classList.add('active');
     }
 
-    // Touchpad Gesture Tracking
+    // High-performance trackpad listener
     const pad = document.getElementById('touchpad');
     let lastX = 0, lastY = 0;
 
     pad.addEventListener('touchstart', (e) => {
       lastX = e.touches[0].clientX;
       lastY = e.touches[0].clientY;
-    });
+    }, { passive: true });
 
     pad.addEventListener('touchmove', (e) => {
       const touch = e.touches[0];
@@ -385,7 +429,7 @@
       lastY = touch.clientY;
 
       send({ type: 'mouse_move', dx: dx, dy: dy });
-    });
+    }, { passive: true });
   </script>
 </body>
 </html>

@@ -87,7 +87,7 @@
       flex-shrink: 0;
     }
 
-    /* Deck Switcher Tabs */
+    /* Navigation Tabs */
     .tab-bar {
       display: flex;
       gap: 6px;
@@ -114,11 +114,11 @@
       box-shadow: 0 0 8px rgba(0, 136, 255, 0.2);
     }
 
-    /* Main Container View */
+    /* Container Views */
     .deck-container {
       flex: 1;
       display: none;
-      min-height: 0; /* Important for flex child sizing */
+      min-height: 0;
     }
 
     .deck-container.active {
@@ -170,7 +170,7 @@
     .tile-audio { border-top: 2px solid var(--accent-blue); }
     .tile-audio .icon { color: var(--accent-blue); }
 
-    /* Single Frame Trackpad Layout */
+    /* Trackpad Frame & Buttons */
     #mouse-deck {
       height: 100%;
       justify-content: space-between;
@@ -178,7 +178,6 @@
 
     #touchpad {
       flex: 1;
-      width: 100%;
       background: var(--card-bg);
       border: 2px dashed var(--card-border);
       border-radius: 12px;
@@ -222,7 +221,7 @@
       background: #21262d;
     }
 
-    /* Keyboard Layout */
+    /* Keyboard Deck Layout */
     .text-input-group {
       display: flex;
       gap: 6px;
@@ -379,12 +378,21 @@
     </div>
   </div>
 
-  <!-- TAB 4: COMPACT TRACKPAD & CLICK BUTTONS -->
+  <!-- TAB 4: COMPACT TRACKPAD & SCROLL STRIP -->
   <div id="mouse-deck" class="deck-container">
-    <div id="touchpad">
-      <span>Slide finger to move mouse</span>
-      <span style="font-size: 0.7rem; color: #8b949e; margin-top: 4px;">Tap = Left | 2-Finger = Right</span>
+    <div style="display: flex; gap: 8px; flex: 1; width: 100%; min-height: 0;">
+      <!-- Touchpad Surface -->
+      <div id="touchpad">
+        <span>Slide finger to move mouse</span>
+        <span style="font-size: 0.7rem; color: #8b949e; margin-top: 4px;">1 Finger Tap = Left Click<br>2 Finger Tap = Right Click</span>
+      </div>
+      <!-- Scroll Strip -->
+      <div id="scrollpad" style="width: 42px; background: #090d11; border: 1px solid var(--card-border); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-sub); font-size: 0.8rem; touch-action: none;">
+        ⇕
+      </div>
     </div>
+    
+    <!-- Left & Right Click Buttons -->
     <div class="mouse-actions">
       <button class="btn-mouse" onclick="sendClick('left')">Left Click</button>
       <button class="btn-mouse" onclick="sendClick('right')">Right Click</button>
@@ -452,45 +460,72 @@
       el.classList.add('active');
     }
 
-    // Touchpad listener
+    // Touchpad & Gesture Tracking
     const pad = document.getElementById('touchpad');
+    const scrollPad = document.getElementById('scrollpad');
+    
     let lastX = 0, lastY = 0;
     let touchStartTime = 0;
     let isMoving = false;
+    let maxFingersSeen = 0;
 
     pad.addEventListener('touchstart', (e) => {
       touchStartTime = Date.now();
       isMoving = false;
+      maxFingersSeen = Math.max(maxFingersSeen, e.touches.length);
       lastX = e.touches[0].clientX;
       lastY = e.touches[0].clientY;
     }, { passive: true });
 
     pad.addEventListener('touchmove', (e) => {
+      maxFingersSeen = Math.max(maxFingersSeen, e.touches.length);
+
       const touch = e.touches[0];
       const dx = touch.clientX - lastX;
       const dy = touch.clientY - lastY;
 
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
         isMoving = true;
       }
 
       lastX = touch.clientX;
       lastY = touch.clientY;
 
-      send({ type: 'mouse_move', dx: dx, dy: dy });
+      if (e.touches.length === 1) {
+        send({ type: 'mouse_move', dx: dx, dy: dy });
+      }
     }, { passive: true });
 
     pad.addEventListener('touchend', (e) => {
       const touchDuration = Date.now() - touchStartTime;
 
-      if (!isMoving && touchDuration < 200) {
-        if (e.changedTouches.length === 2) {
-          sendClick('right');
-        } else {
-          sendClick('left');
+      if (e.touches.length === 0) {
+        if (!isMoving && touchDuration < 300) {
+          if (maxFingersSeen >= 2) {
+            sendClick('right');
+          } else {
+            sendClick('left');
+          }
         }
+        maxFingersSeen = 0;
       }
     });
+
+    // Dedicated Side Scroll Strip Handling
+    let lastScrollY = 0;
+    scrollPad.addEventListener('touchstart', (e) => {
+      lastScrollY = e.touches[0].clientY;
+    }, { passive: true });
+
+    scrollPad.addEventListener('touchmove', (e) => {
+      const currentY = e.touches[0].clientY;
+      const deltaY = lastScrollY - currentY;
+      
+      if (Math.abs(deltaY) > 2) {
+        send({ type: 'mouse_scroll', amount: Math.round(deltaY * 5) });
+        lastScrollY = currentY;
+      }
+    }, { passive: true });
   </script>
 </body>
 </html>

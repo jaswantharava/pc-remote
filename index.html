@@ -17,7 +17,13 @@
       --text-sub: #8b949e;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      user-select: none; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+    }
     
     body {
       background: var(--bg-color);
@@ -55,10 +61,13 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: #ef4444; /* Default disconnected */
+      background: #ef4444;
     }
 
-    .status-dot.connected { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .status-dot.connected { 
+      background: #22c55e; 
+      box-shadow: 0 0 8px #22c55e; 
+    }
 
     .btn-connect {
       background: var(--accent-blue);
@@ -109,14 +118,13 @@
       gap: 12px;
     }
 
-    /* Stream Deck Tile Grid Layout */
+    /* Deck Tile Grid */
     .deck-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 10px;
     }
 
-    /* Deckboard Button Tile Styling */
     .deck-tile {
       background: linear-gradient(145deg, #1c2128, #161b22);
       border: 1px solid var(--card-border);
@@ -142,7 +150,6 @@
     .deck-tile .icon { font-size: 1.3rem; }
     .deck-tile .label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-sub); text-align: center; }
 
-    /* Category Themes */
     .tile-yt { border-top: 2px solid var(--accent-red); }
     .tile-yt .icon { color: var(--accent-red); }
 
@@ -155,19 +162,22 @@
     .tile-audio { border-top: 2px solid var(--accent-blue); }
     .tile-audio .icon { color: var(--accent-blue); }
 
-    /* Smooth Trackpad Area */
+    /* Trackpad & Mouse Styling */
     #touchpad {
       flex: 1;
       background: var(--card-bg);
       border: 2px dashed var(--card-border);
       border-radius: 14px;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: var(--text-sub);
+      color: var(--text-main);
       font-weight: 600;
       touch-action: none;
       min-height: 220px;
+      text-align: center;
+      padding: 10px;
     }
 
     .mouse-actions {
@@ -179,10 +189,21 @@
     .btn-mouse {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
+      border-bottom: 3px solid #090d11;
       color: var(--text-main);
-      padding: 14px;
+      padding: 16px;
       border-radius: 10px;
       font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.08s ease;
+    }
+
+    .btn-mouse:active {
+      transform: translateY(2px);
+      border-bottom-width: 1px;
+      background: #21262d;
     }
 
     /* Keyboard Deck Styling */
@@ -341,9 +362,12 @@
     </div>
   </div>
 
-  <!-- TAB 4: SMOOTH TRACKPAD -->
+  <!-- TAB 4: SMOOTH TRACKPAD WITH CLICK BUTTONS -->
   <div id="mouse-deck" class="deck-container">
-    <div id="touchpad">Slide finger to control mouse</div>
+    <div id="touchpad">
+      <span>Slide finger to move mouse</span>
+      <span style="font-size: 0.75rem; color: #8b949e; margin-top: 6px;">Tap = Left Click | 2-Finger Tap = Right Click</span>
+    </div>
     <div class="mouse-actions">
       <button class="btn-mouse" onclick="sendClick('left')">Left Click</button>
       <button class="btn-mouse" onclick="sendClick('right')">Right Click</button>
@@ -367,7 +391,6 @@
 
       ws.onopen = () => {
         document.getElementById('statusDot').classList.add('connected');
-        // Heartbeat ping every 10 seconds to stop mobile disconnects
         clearInterval(pingInterval);
         pingInterval = setInterval(() => {
           if (ws && ws.readyState === WebSocket.OPEN) {
@@ -412,11 +435,15 @@
       el.classList.add('active');
     }
 
-    // High-performance trackpad listener
+    // Touchpad Movement & Tap Detection
     const pad = document.getElementById('touchpad');
     let lastX = 0, lastY = 0;
+    let touchStartTime = 0;
+    let isMoving = false;
 
     pad.addEventListener('touchstart', (e) => {
+      touchStartTime = Date.now();
+      isMoving = false;
       lastX = e.touches[0].clientX;
       lastY = e.touches[0].clientY;
     }, { passive: true });
@@ -425,11 +452,28 @@
       const touch = e.touches[0];
       const dx = touch.clientX - lastX;
       const dy = touch.clientY - lastY;
+
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        isMoving = true;
+      }
+
       lastX = touch.clientX;
       lastY = touch.clientY;
 
       send({ type: 'mouse_move', dx: dx, dy: dy });
     }, { passive: true });
+
+    pad.addEventListener('touchend', (e) => {
+      const touchDuration = Date.now() - touchStartTime;
+
+      if (!isMoving && touchDuration < 200) {
+        if (e.changedTouches.length === 2) {
+          sendClick('right');
+        } else {
+          sendClick('left');
+        }
+      }
+    });
   </script>
 </body>
 </html>

@@ -322,7 +322,7 @@
       margin-top: 4px;
     }
 
-    /* Authentication PIN Overlay Modal */
+    /* Security PIN Overlay Modal */
     .auth-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -572,9 +572,23 @@
     let pingInterval = null;
     let sessionToken = localStorage.getItem('deck_session_token') || '';
     let customMacros = JSON.parse(localStorage.getItem('deck_custom_macros') || '[]');
+    let autoPin = null;
 
     window.onload = () => {
       renderCustomMacros();
+      
+      // Extract IP and PIN from URL if scanned from QR Code
+      const params = new URLSearchParams(window.location.search);
+      const urlIp = params.get('ip');
+      autoPin = params.get('pin');
+
+      if (urlIp) document.getElementById('serverIp').value = urlIp;
+      if (autoPin) document.getElementById('pinInput').value = autoPin;
+
+      // Auto-connect if URL parameters exist
+      if (urlIp) {
+        connectWS();
+      }
     };
 
     function connectWS() {
@@ -584,13 +598,25 @@
         return;
       }
 
+      // 1. If NO saved token AND NO auto PIN from QR code, demand PIN modal immediately
+      if (!sessionToken && !autoPin) {
+        document.getElementById('authModal').style.display = 'flex';
+        return;
+      }
+
       if (ws) ws.close();
 
       ws = new WebSocket(`ws://${ip}:8765`);
 
       ws.onopen = () => {
-        // Authenticate with existing session token first
-        ws.send(JSON.stringify({ type: 'authenticate', token: sessionToken }));
+        // Attempt token authentication if available
+        if (sessionToken) {
+          ws.send(JSON.stringify({ type: 'authenticate', token: sessionToken }));
+        } else if (autoPin) {
+          // Fallback to QR code PIN
+          ws.send(JSON.stringify({ type: 'authenticate', pin: autoPin }));
+          autoPin = null;
+        }
       };
 
       ws.onmessage = (e) => {
@@ -602,7 +628,9 @@
             document.getElementById('statusDot').classList.add('connected');
             document.getElementById('authModal').style.display = 'none';
 
-            // Keepalive ping loop
+            // Clean up address bar params
+            window.history.replaceState({}, document.title, window.location.pathname);
+
             clearInterval(pingInterval);
             pingInterval = setInterval(() => {
               if (ws && ws.readyState === WebSocket.OPEN) {
@@ -610,7 +638,10 @@
               }
             }, 10000);
           } else {
-            // Show PIN prompt modal on failure
+            // Authentication failed: Clear invalid token and demand PIN entry modal
+            sessionToken = '';
+            localStorage.removeItem('deck_session_token');
+            document.getElementById('statusDot').classList.remove('connected');
             document.getElementById('authModal').style.display = 'flex';
           }
         }
@@ -628,16 +659,45 @@
 
     function submitPin() {
       const pin = document.getElementById('pinInput').value.trim();
-      if (pin.length === 6 && ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'authenticate', pin: pin }));
-      } else {
+      const ip = document.getElementById('serverIp').value.trim();
+
+      if (pin.length !== 6) {
         alert("Please enter a valid 6-digit PIN.");
+        return;
+      }
+
+      if (!ip) {
+        alert("Please enter your PC's IP address first.");
+        return;
+      }
+
+      // Ensure connection is established before transmitting PIN
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        ws = new WebSocket(`ws://${ip}:8765`);
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ type: 'authenticate', pin: pin }));
+        };
+        ws.onmessage = (e) => {
+          const res = JSON.parse(e.data);
+          if (res.type === 'auth_result') {
+            if (res.status === 'success') {
+              sessionToken = res.token;
+              localStorage.setItem('deck_session_token', sessionToken);
+              document.getElementById('statusDot').classList.add('connected');
+              document.getElementById('authModal').style.display = 'none';
+            } else {
+              alert("Incorrect PIN. Please check your PC terminal screen.");
+            }
+          }
+        };
+      } else {
+        ws.send(JSON.stringify({ type: 'authenticate', pin: pin }));
       }
     }
 
     function send(data) {
       if (ws && ws.readyState === WebSocket.OPEN) {
-        data.token = sessionToken; // Attach authorization token to every payload
+        data.token = sessionToken;
         ws.send(JSON.stringify(data));
       }
     }
@@ -669,11 +729,7 @@
     function toggleNewCategoryInput() {
       const select = document.getElementById('macroCategory');
       const newCatInput = document.getElementById('newCatName');
-      if (select.value === '__new__') {
-        newCatInput.style.display = 'block';
-      } else {
-        newCatInput.style.display = 'none';
-      }
+      newCatInput.style.display = (select.value === '__new__') ? 'block' : 'none';
     }
 
     function fillYouTubePreset() {
@@ -815,9 +871,7 @@
       const dx = touch.clientX - lastX;
       const dy = touch.clientY - lastY;
 
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-        isMoving = true;
-      }
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) isMoving = true;
 
       lastX = touch.clientX;
       lastY = touch.clientY;

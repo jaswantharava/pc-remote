@@ -13,6 +13,7 @@
       --accent-blue: #0088ff;
       --accent-purple: #8b5cf6;
       --accent-green: #238636;
+      --accent-orange: #f97316;
       --text-main: #f0f6fc;
       --text-sub: #8b949e;
     }
@@ -92,14 +93,18 @@
       display: flex;
       gap: 6px;
       flex-shrink: 0;
+      overflow-x: auto;
+      white-space: nowrap;
+      padding-bottom: 2px;
     }
 
     .tab-btn {
       flex: 1;
+      min-width: 70px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       color: var(--text-sub);
-      padding: 8px 0;
+      padding: 8px 10px;
       border-radius: 8px;
       font-weight: 600;
       font-size: 0.75rem;
@@ -147,6 +152,7 @@
       justify-content: center;
       gap: 4px;
       cursor: pointer;
+      position: relative;
     }
 
     .deck-tile:active {
@@ -156,7 +162,7 @@
     }
 
     .deck-tile .icon { font-size: 1.2rem; }
-    .deck-tile .label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; color: var(--text-sub); text-align: center; }
+    .deck-tile .label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; color: var(--text-sub); text-align: center; padding: 0 4px; word-break: break-word; }
 
     .tile-yt { border-top: 2px solid var(--accent-red); }
     .tile-yt .icon { color: var(--accent-red); }
@@ -169,6 +175,9 @@
 
     .tile-audio { border-top: 2px solid var(--accent-blue); }
     .tile-audio .icon { color: var(--accent-blue); }
+
+    .tile-custom { border-top: 2px solid var(--accent-orange); }
+    .tile-custom .icon { color: var(--accent-orange); }
 
     /* Trackpad Frame & Remote Buttons */
     #mouse-deck {
@@ -237,21 +246,56 @@
       color: var(--accent-blue);
     }
 
-    /* Keyboard Deck Layout */
+    /* Keyboard Deck & Macro Form Layout */
     .text-input-group {
       display: flex;
       gap: 6px;
       flex-shrink: 0;
     }
 
-    .text-input-group input {
+    .text-input-group input, .macro-form input, .macro-form select {
       flex: 1;
       background: #090d11;
       border: 1px solid var(--card-border);
       color: #fff;
       padding: 10px;
       border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .macro-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: var(--card-bg);
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      overflow-y: auto;
+    }
+
+    .macro-form label {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      font-weight: 600;
+      margin-bottom: -4px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-submit {
+      background: var(--accent-purple);
+      border: none;
+      color: white;
+      font-weight: 700;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
       font-size: 0.9rem;
+      margin-top: 4px;
     }
   </style>
 </head>
@@ -265,16 +309,17 @@
   </div>
 
   <!-- Deck Navigation Tabs -->
-  <div class="tab-bar">
+  <div class="tab-bar" id="tabBar">
     <div class="tab-btn active" onclick="switchTab('yt-deck', this)">YouTube</div>
     <div class="tab-btn" onclick="switchTab('key-deck', this)">Keyboard</div>
     <div class="tab-btn" onclick="switchTab('reels-deck', this)">Shorts/Reels</div>
     <div class="tab-btn" onclick="switchTab('mouse-deck', this)">Trackpad</div>
+    <div class="tab-btn" style="color: var(--accent-orange);" onclick="switchTab('add-deck', this)">+ Add</div>
   </div>
 
   <!-- TAB 1: YOUTUBE CONTROLS -->
   <div id="yt-deck" class="deck-container active">
-    <div class="deck-grid">
+    <div class="deck-grid" id="grid-yt">
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_play_pause')">
         <span class="icon">⏯</span>
         <span class="label">Play / Pause</span>
@@ -335,7 +380,7 @@
       <button class="btn-connect" style="background: var(--accent-green);" onclick="sendTypedText()">Send</button>
     </div>
 
-    <div class="deck-grid">
+    <div class="deck-grid" id="grid-key">
       <div class="deck-tile tile-key" onclick="sendKeyPress('backspace')">
         <span class="icon">⌫</span>
         <span class="label">Backspace</span>
@@ -374,7 +419,7 @@
 
   <!-- TAB 3: SHORTS & REELS DECK -->
   <div id="reels-deck" class="deck-container">
-    <div class="deck-grid">
+    <div class="deck-grid" id="grid-reels">
       <div class="deck-tile tile-mode" onclick="sendMacro('reels_prev')">
         <span class="icon">⬆</span>
         <span class="label">Prev Reel</span>
@@ -419,9 +464,42 @@
     </div>
   </div>
 
+  <!-- TAB 5: ADD MACRO BUILDER DECK -->
+  <div id="add-deck" class="deck-container">
+    <div class="macro-form">
+      <h3 style="font-size: 0.95rem; color: var(--text-main);">Create Custom Macro Button</h3>
+      
+      <label>Button Label</label>
+      <input type="text" id="macroName" placeholder="e.g. Refresh, Play, Save">
+
+      <label>Icon / Emoji</label>
+      <input type="text" id="macroIcon" placeholder="e.g. 🔄, ⚡, 🎮 (Defaults to ⚡)">
+
+      <label>Category Target</label>
+      <select id="macroCategory" onchange="toggleNewCategoryInput()">
+        <option value="yt">YouTube</option>
+        <option value="key">Keyboard</option>
+        <option value="reels">Shorts / Instagram Reels</option>
+        <option value="__new__">+ Create New Category...</option>
+      </select>
+
+      <input type="text" id="newCatName" placeholder="Enter New Category Name" style="display: none;">
+
+      <label>Key or Hotkey Combo (comma-separated)</label>
+      <input type="text" id="macroKeys" placeholder="e.g. 'f5' or 'ctrl, s' or 'alt, tab'">
+
+      <button class="btn-submit" onclick="saveCustomMacro()">Add Macro Button</button>
+    </div>
+  </div>
+
   <script>
     let ws = null;
     let pingInterval = null;
+    let customMacros = JSON.parse(localStorage.getItem('deck_custom_macros') || '[]');
+
+    window.onload = () => {
+      renderCustomMacros();
+    };
 
     function connectWS() {
       const ip = document.getElementById('serverIp').value.trim();
@@ -478,6 +556,124 @@
       document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
       el.classList.add('active');
+    }
+
+    function toggleNewCategoryInput() {
+      const select = document.getElementById('macroCategory');
+      const newCatInput = document.getElementById('newCatName');
+      if (select.value === '__new__') {
+        newCatInput.style.display = 'block';
+      } else {
+        newCatInput.style.display = 'none';
+      }
+    }
+
+    function saveCustomMacro() {
+      const name = document.getElementById('macroName').value.trim();
+      const icon = document.getElementById('macroIcon').value.trim() || '⚡';
+      let category = document.getElementById('macroCategory').value;
+      const newCatName = document.getElementById('newCatName').value.trim();
+      const keysRaw = document.getElementById('macroKeys').value.trim();
+
+      if (!name || !keysRaw) {
+        alert("Please provide both a label and key commands.");
+        return;
+      }
+
+      if (category === '__new__') {
+        if (!newCatName) {
+          alert("Please enter a name for the new category.");
+          return;
+        }
+        category = newCatName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      }
+
+      const keys = keysRaw.split(',').map(k => k.trim());
+
+      const macroObj = {
+        id: Date.now(),
+        name: name,
+        icon: icon,
+        category: category,
+        categoryLabel: category === newCatName.toLowerCase().replace(/[^a-z0-9]/g, '_') ? newCatName : category,
+        keys: keys
+      };
+
+      customMacros.push(macroObj);
+      localStorage.setItem('deck_custom_macros', JSON.stringify(customMacros));
+
+      // Clear Form Inputs
+      document.getElementById('macroName').value = '';
+      document.getElementById('macroIcon').value = '';
+      document.getElementById('macroKeys').value = '';
+      document.getElementById('newCatName').value = '';
+      document.getElementById('macroCategory').value = 'yt';
+      toggleNewCategoryInput();
+
+      renderCustomMacros();
+      alert(`Macro '${name}' added successfully!`);
+    }
+
+    function renderCustomMacros() {
+      const tabBar = document.getElementById('tabBar');
+      const categorySelect = document.getElementById('macroCategory');
+
+      // Clear non-static components
+      document.querySelectorAll('.custom-dynamic-tab').forEach(e => e.remove());
+      document.querySelectorAll('.custom-dynamic-container').forEach(e => e.remove());
+
+      // Reset options in dropdown
+      categorySelect.innerHTML = `
+        <option value="yt">YouTube</option>
+        <option value="key">Keyboard</option>
+        <option value="reels">Shorts / Instagram Reels</option>
+        <option value="__new__">+ Create New Category...</option>
+      `;
+
+      customMacros.forEach(macro => {
+        let gridId = `grid-${macro.category}`;
+        let gridContainer = document.getElementById(gridId);
+
+        // If target category is custom and doesn't exist yet, render tab & container
+        if (!gridContainer) {
+          const tabBtn = document.createElement('div');
+          tabBtn.className = 'tab-btn custom-dynamic-tab';
+          tabBtn.innerText = macro.categoryLabel || macro.category;
+          tabBtn.onclick = function() { switchTab(`${macro.category}-deck`, this); };
+          tabBar.insertBefore(tabBtn, tabBar.lastElementChild);
+
+          const deckContainer = document.createElement('div');
+          deckContainer.id = `${macro.category}-deck`;
+          deckContainer.className = 'deck-container custom-dynamic-container';
+          deckContainer.innerHTML = `<div class="deck-grid" id="${gridId}"></div>`;
+          document.body.insertBefore(deckContainer, document.getElementById('add-deck'));
+
+          // Add to Select Dropdown
+          const option = document.createElement('option');
+          option.value = macro.category;
+          option.innerText = macro.categoryLabel || macro.category;
+          categorySelect.insertBefore(option, categorySelect.lastElementChild);
+
+          gridContainer = document.getElementById(gridId);
+        }
+
+        // Render Macro Tile
+        const tile = document.createElement('div');
+        tile.className = 'deck-tile tile-custom';
+        tile.onclick = () => {
+          if (macro.keys.length === 1) {
+            sendKeyPress(macro.keys[0]);
+          } else {
+            sendHotkey(macro.keys);
+          }
+        };
+
+        tile.innerHTML = `
+          <span class="icon">${macro.icon}</span>
+          <span class="label">${macro.name}</span>
+        `;
+        gridContainer.appendChild(tile);
+      });
     }
 
     // Touchpad & Gesture Tracking

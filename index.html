@@ -598,7 +598,7 @@
         return;
       }
 
-      // 1. If NO saved token AND NO auto PIN from QR code, demand PIN modal immediately
+      // If NO saved token AND NO auto PIN from QR code, demand PIN modal immediately
       if (!sessionToken && !autoPin) {
         document.getElementById('authModal').style.display = 'flex';
         return;

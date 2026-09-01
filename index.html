@@ -164,6 +164,30 @@
     .deck-tile .icon { font-size: 1.2rem; }
     .deck-tile .label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; color: var(--text-sub); text-align: center; padding: 0 4px; word-break: break-word; }
 
+    /* Delete Button on Custom Tiles */
+    .btn-delete-macro {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #ef4444;
+      font-size: 0.65rem;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-delete-macro:hover {
+      background: #ef4444;
+      color: white;
+    }
+
     .tile-yt { border-top: 2px solid var(--accent-red); }
     .tile-yt .icon { color: var(--accent-red); }
 
@@ -202,7 +226,6 @@
       padding: 8px;
     }
 
-    /* Dynamic Action Grid (Remote Buttons) */
     .mouse-remote-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1.2fr;
@@ -253,7 +276,7 @@
       flex-shrink: 0;
     }
 
-    .text-input-group input, .macro-form input, .macro-form select {
+    .text-input-group input, .macro-form input, .macro-form select, .macro-form textarea {
       flex: 1;
       background: #090d11;
       border: 1px solid var(--card-border);
@@ -281,9 +304,16 @@
       margin-bottom: -4px;
     }
 
-    .form-row {
-      display: flex;
-      gap: 8px;
+    .btn-preset {
+      background: #21262d;
+      border: 1px dashed var(--accent-orange);
+      color: var(--accent-orange);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+      align-self: flex-start;
     }
 
     .btn-submit {
@@ -464,16 +494,18 @@
     </div>
   </div>
 
-  <!-- TAB 5: ADD MACRO BUILDER DECK -->
+  <!-- TAB 5: ADVANCED MULTI-STEP MACRO BUILDER -->
   <div id="add-deck" class="deck-container">
     <div class="macro-form">
-      <h3 style="font-size: 0.95rem; color: var(--text-main);">Create Custom Macro Button</h3>
+      <h3 style="font-size: 0.95rem; color: var(--text-main);">Custom Macro Builder</h3>
       
+      <button class="btn-preset" onclick="fillYouTubePreset()">⚡ Auto-Fill "Open YouTube" Template</button>
+
       <label>Button Label</label>
-      <input type="text" id="macroName" placeholder="e.g. Refresh, Play, Save">
+      <input type="text" id="macroName" placeholder="e.g. Open YouTube, Launch App">
 
       <label>Icon / Emoji</label>
-      <input type="text" id="macroIcon" placeholder="e.g. 🔄, ⚡, 🎮 (Defaults to ⚡)">
+      <input type="text" id="macroIcon" placeholder="e.g. 🔴, 🌐, 🚀 (Defaults to ⚡)">
 
       <label>Category Target</label>
       <select id="macroCategory" onchange="toggleNewCategoryInput()">
@@ -485,10 +517,13 @@
 
       <input type="text" id="newCatName" placeholder="Enter New Category Name" style="display: none;">
 
-      <label>Key or Hotkey Combo (comma-separated)</label>
-      <input type="text" id="macroKeys" placeholder="e.g. 'f5' or 'ctrl, s' or 'alt, tab'">
+      <label>Action Sequence (Comma-Separated Steps)</label>
+      <textarea id="macroSequence" rows="3" placeholder="Examples:&#10;• Simple Hotkey: ctrl, c&#10;• App Launch: win, delay:300, youtube, delay:300, enter"></textarea>
+      <span style="font-size: 0.65rem; color: var(--text-sub);">
+        Format: <code>win</code> (key), <code>delay:300</code> (pause in ms), or any typed string like <code>youtube</code>.
+      </span>
 
-      <button class="btn-submit" onclick="saveCustomMacro()">Add Macro Button</button>
+      <button class="btn-submit" onclick="saveCustomMacro()">Add Custom Macro Button</button>
     </div>
   </div>
 
@@ -543,6 +578,10 @@
     function sendKeyPress(key) { send({ type: 'key_press', key: key }); }
     function sendHotkey(keys) { send({ type: 'hotkey', keys: keys }); }
 
+    function executeSequence(sequence) {
+      send({ type: 'sequence', steps: sequence });
+    }
+
     function sendTypedText() {
       const input = document.getElementById('keyboardText');
       if (input.value) {
@@ -568,15 +607,23 @@
       }
     }
 
+    function fillYouTubePreset() {
+      document.getElementById('macroName').value = 'Open YouTube';
+      document.getElementById('macroIcon').value = '🔴';
+      document.getElementById('macroCategory').value = 'yt';
+      document.getElementById('macroSequence').value = 'win, delay:200, youtube, delay:300, enter';
+      toggleNewCategoryInput();
+    }
+
     function saveCustomMacro() {
       const name = document.getElementById('macroName').value.trim();
       const icon = document.getElementById('macroIcon').value.trim() || '⚡';
       let category = document.getElementById('macroCategory').value;
       const newCatName = document.getElementById('newCatName').value.trim();
-      const keysRaw = document.getElementById('macroKeys').value.trim();
+      const sequenceRaw = document.getElementById('macroSequence').value.trim();
 
-      if (!name || !keysRaw) {
-        alert("Please provide both a label and key commands.");
+      if (!name || !sequenceRaw) {
+        alert("Please provide both a label and a sequence.");
         return;
       }
 
@@ -588,7 +635,7 @@
         category = newCatName.toLowerCase().replace(/[^a-z0-9]/g, '_');
       }
 
-      const keys = keysRaw.split(',').map(k => k.trim());
+      const steps = sequenceRaw.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
       const macroObj = {
         id: Date.now(),
@@ -596,7 +643,7 @@
         icon: icon,
         category: category,
         categoryLabel: category === newCatName.toLowerCase().replace(/[^a-z0-9]/g, '_') ? newCatName : category,
-        keys: keys
+        steps: steps
       };
 
       customMacros.push(macroObj);
@@ -605,22 +652,32 @@
       // Clear Form Inputs
       document.getElementById('macroName').value = '';
       document.getElementById('macroIcon').value = '';
-      document.getElementById('macroKeys').value = '';
+      document.getElementById('macroSequence').value = '';
       document.getElementById('newCatName').value = '';
       document.getElementById('macroCategory').value = 'yt';
       toggleNewCategoryInput();
 
       renderCustomMacros();
-      alert(`Macro '${name}' added successfully!`);
+      alert(`Macro '${name}' added!`);
+    }
+
+    function deleteCustomMacro(id, event) {
+      event.stopPropagation(); // Prevent triggering macro click
+      if (confirm("Delete this macro tile?")) {
+        customMacros = customMacros.filter(m => m.id !== id);
+        localStorage.setItem('deck_custom_macros', JSON.stringify(customMacros));
+        renderCustomMacros();
+      }
     }
 
     function renderCustomMacros() {
       const tabBar = document.getElementById('tabBar');
       const categorySelect = document.getElementById('macroCategory');
 
-      // Clear non-static components
+      // Clear dynamic elements
       document.querySelectorAll('.custom-dynamic-tab').forEach(e => e.remove());
       document.querySelectorAll('.custom-dynamic-container').forEach(e => e.remove());
+      document.querySelectorAll('.custom-tile-rendered').forEach(e => e.remove());
 
       // Reset options in dropdown
       categorySelect.innerHTML = `
@@ -634,7 +691,7 @@
         let gridId = `grid-${macro.category}`;
         let gridContainer = document.getElementById(gridId);
 
-        // If target category is custom and doesn't exist yet, render tab & container
+        // Render tab/container if target dynamic category doesn't exist yet
         if (!gridContainer) {
           const tabBtn = document.createElement('div');
           tabBtn.className = 'tab-btn custom-dynamic-tab';
@@ -648,7 +705,6 @@
           deckContainer.innerHTML = `<div class="deck-grid" id="${gridId}"></div>`;
           document.body.insertBefore(deckContainer, document.getElementById('add-deck'));
 
-          // Add to Select Dropdown
           const option = document.createElement('option');
           option.value = macro.category;
           option.innerText = macro.categoryLabel || macro.category;
@@ -657,18 +713,13 @@
           gridContainer = document.getElementById(gridId);
         }
 
-        // Render Macro Tile
+        // Render Macro Tile with Delete Button
         const tile = document.createElement('div');
-        tile.className = 'deck-tile tile-custom';
-        tile.onclick = () => {
-          if (macro.keys.length === 1) {
-            sendKeyPress(macro.keys[0]);
-          } else {
-            sendHotkey(macro.keys);
-          }
-        };
+        tile.className = 'deck-tile tile-custom custom-tile-rendered';
+        tile.onclick = () => executeSequence(macro.steps);
 
         tile.innerHTML = `
+          <div class="btn-delete-macro" onclick="deleteCustomMacro(${macro.id}, event)">✕</div>
           <span class="icon">${macro.icon}</span>
           <span class="label">${macro.name}</span>
         `;

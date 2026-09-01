@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Deckboard Pro Controller</title>
+  
+  <!-- HTML5 QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
   <style>
     :root {
       --bg-color: #0d1117;
@@ -88,6 +92,20 @@
       flex-shrink: 0;
     }
 
+    .btn-scan {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     /* Navigation Tabs */
     .tab-bar {
       display: flex;
@@ -164,7 +182,6 @@
     .deck-tile .icon { font-size: 1.2rem; }
     .deck-tile .label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; color: var(--text-sub); text-align: center; padding: 0 4px; word-break: break-word; }
 
-    /* Delete Button on Custom Tiles */
     .btn-delete-macro {
       position: absolute;
       top: 3px;
@@ -181,11 +198,6 @@
       justify-content: center;
       cursor: pointer;
       font-weight: bold;
-    }
-
-    .btn-delete-macro:hover {
-      background: #ef4444;
-      color: white;
     }
 
     .tile-yt { border-top: 2px solid var(--accent-red); }
@@ -269,7 +281,7 @@
       color: var(--accent-blue);
     }
 
-    /* Keyboard Deck & Macro Form Layout */
+    /* Form Layout */
     .text-input-group {
       display: flex;
       gap: 6px;
@@ -327,14 +339,77 @@
       font-size: 0.9rem;
       margin-top: 4px;
     }
+
+    /* Modals (Auth & Scanner) */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(13, 17, 23, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 20px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .modal-box input {
+      background: #090d11;
+      border: 1px solid var(--card-border);
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      letter-spacing: 4px;
+      text-align: center;
+    }
+
+    #qr-reader {
+      width: 100%;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+    }
   </style>
 </head>
 <body>
 
+  <!-- Auth PIN Prompt Modal -->
+  <div id="authModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <h3 style="color: var(--text-main);">Security Pair</h3>
+      <p style="font-size: 0.8rem; color: var(--text-sub);">Enter the 6-digit PIN shown on your PC terminal screen.</p>
+      <input type="number" id="pinInput" placeholder="123456" maxlength="6">
+      <button class="btn-submit" onclick="submitPin()">Verify & Pair</button>
+    </div>
+  </div>
+
+  <!-- Built-In Scanner Modal -->
+  <div id="scannerModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <h3 style="color: var(--text-main);">Scan PC QR Code</h3>
+      <div id="qr-reader"></div>
+      <button class="btn-submit" style="background: #ef4444;" onclick="closeScanner()">Cancel</button>
+    </div>
+  </div>
+
   <!-- Connection Header -->
   <div class="header">
     <div id="statusDot" class="status-dot"></div>
-    <input type="text" id="serverIp" placeholder="PC IP Address (e.g. 192.168.1.5)">
+    <input type="text" id="serverIp" placeholder="PC IP (e.g. 192.168.1.5)">
+    <button class="btn-scan" onclick="openScanner()" title="Scan QR Code from Terminal">📷</button>
     <button class="btn-connect" onclick="connectWS()">Connect</button>
   </div>
 
@@ -472,18 +547,15 @@
   <!-- TAB 4: TRACKPAD WITH INTEGRATED REMOTE BUTTONS -->
   <div id="mouse-deck" class="deck-container">
     <div style="display: flex; gap: 8px; flex: 1; width: 100%; min-height: 0;">
-      <!-- Touchpad Surface -->
       <div id="touchpad">
         <span>Slide finger to move mouse</span>
         <span style="font-size: 0.7rem; color: #8b949e; margin-top: 4px;">1 Finger Tap = Left Click<br>2 Finger Tap = Right Click</span>
       </div>
-      <!-- Scroll Strip -->
       <div id="scrollpad" style="width: 42px; background: #090d11; border: 1px solid var(--card-border); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-sub); font-size: 0.8rem; touch-action: none;">
         ⇕
       </div>
     </div>
     
-    <!-- Left Click, Right Click & Up/Down Remote Controls -->
     <div class="mouse-remote-grid">
       <button class="btn-mouse" style="height: 100%;" onclick="sendClick('left')">Left Click</button>
       <button class="btn-mouse" style="height: 100%;" onclick="sendClick('right')">Right Click</button>
@@ -530,45 +602,127 @@
   <script>
     let ws = null;
     let pingInterval = null;
+    let sessionToken = localStorage.getItem('deck_session_token') || '';
     let customMacros = JSON.parse(localStorage.getItem('deck_custom_macros') || '[]');
+    let autoPin = null;
+    let html5QrCode = null;
 
     window.onload = () => {
       renderCustomMacros();
+      
+      // Check parameters if page opened directly from camera link
+      const params = new URLSearchParams(window.location.search);
+      const urlIp = params.get('ip');
+      autoPin = params.get('pin');
+
+      if (urlIp) document.getElementById('serverIp').value = urlIp;
+      if (autoPin) document.getElementById('pinInput').value = autoPin;
+      if (urlIp) connectWS();
     };
 
+    /* --- Built-In Camera Scanner Logic --- */
+    function openScanner() {
+      document.getElementById('scannerModal').style.display = 'flex';
+      html5QrCode = new Html5Qrcode("qr-reader");
+      
+      const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+      
+      html5QrCode.start(
+        { facingMode: "environment" }, 
+        config, 
+        (decodedText) => {
+          // Process scanned URL
+          try {
+            const url = new URL(decodedText);
+            const scannedIp = url.searchParams.get("ip");
+            const scannedPin = url.searchParams.get("pin");
+
+            if (scannedIp) document.getElementById('serverIp').value = scannedIp;
+            if (scannedPin) {
+              autoPin = scannedPin;
+              document.getElementById('pinInput').value = scannedPin;
+            }
+
+            closeScanner();
+            connectWS();
+          } catch (err) {
+            alert("Scanned code is not a valid Deckboard QR code.");
+          }
+        },
+        () => {} // Ignore frame scan errors
+      ).catch(err => {
+        alert("Camera permission denied or camera unavailable.");
+        closeScanner();
+      });
+    }
+
+    function closeScanner() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          document.getElementById('scannerModal').style.display = 'none';
+        }).catch(() => {
+          document.getElementById('scannerModal').style.display = 'none';
+        });
+      } else {
+        document.getElementById('scannerModal').style.display = 'none';
+      }
+    }
+
+    /* --- Connection & Verification --- */
     function connectWS() {
       const ip = document.getElementById('serverIp').value.trim();
-      if (!ip) {
-        alert("Please enter your PC's IP address.");
-        return;
-      }
+      if (!ip) return alert("Please enter your PC's IP address.");
 
       if (ws) ws.close();
-
       ws = new WebSocket(`ws://${ip}:8765`);
 
       ws.onopen = () => {
-        document.getElementById('statusDot').classList.add('connected');
-        clearInterval(pingInterval);
-        pingInterval = setInterval(() => {
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }));
+        ws.send(JSON.stringify({ type: 'authenticate', token: sessionToken }));
+      };
+
+      ws.onmessage = (e) => {
+        const res = JSON.parse(e.data);
+        if (res.type === 'auth_result') {
+          if (res.status === 'success') {
+            sessionToken = res.token;
+            localStorage.setItem('deck_session_token', sessionToken);
+            document.getElementById('statusDot').classList.add('connected');
+            document.getElementById('authModal').style.display = 'none';
+
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            clearInterval(pingInterval);
+            pingInterval = setInterval(() => {
+              if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+            }, 10000);
+          } else {
+            if (autoPin) {
+              ws.send(JSON.stringify({ type: 'authenticate', pin: autoPin }));
+              autoPin = null;
+            } else {
+              document.getElementById('authModal').style.display = 'flex';
+            }
           }
-        }, 10000);
+        }
       };
 
-      ws.onclose = () => {
-        document.getElementById('statusDot').classList.remove('connected');
-        clearInterval(pingInterval);
-      };
+      ws.onclose = () => { document.getElementById('statusDot').classList.remove('connected'); };
+      ws.onerror = () => { document.getElementById('statusDot').classList.remove('connected'); };
+    }
 
-      ws.onerror = () => {
-        document.getElementById('statusDot').classList.remove('connected');
-      };
+    function submitPin() {
+      const pin = document.getElementById('pinInput').value.trim();
+      if (pin.length === 6 && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'authenticate', pin: pin }));
+      } else {
+        alert("Please enter a valid 6-digit PIN.");
+      }
     }
 
     function send(data) {
       if (ws && ws.readyState === WebSocket.OPEN) {
+        data.token = sessionToken;
         ws.send(JSON.stringify(data));
       }
     }
@@ -600,11 +754,7 @@
     function toggleNewCategoryInput() {
       const select = document.getElementById('macroCategory');
       const newCatInput = document.getElementById('newCatName');
-      if (select.value === '__new__') {
-        newCatInput.style.display = 'block';
-      } else {
-        newCatInput.style.display = 'none';
-      }
+      newCatInput.style.display = select.value === '__new__' ? 'block' : 'none';
     }
 
     function fillYouTubePreset() {
@@ -622,16 +772,10 @@
       const newCatName = document.getElementById('newCatName').value.trim();
       const sequenceRaw = document.getElementById('macroSequence').value.trim();
 
-      if (!name || !sequenceRaw) {
-        alert("Please provide both a label and a sequence.");
-        return;
-      }
+      if (!name || !sequenceRaw) return alert("Please provide both a label and a sequence.");
 
       if (category === '__new__') {
-        if (!newCatName) {
-          alert("Please enter a name for the new category.");
-          return;
-        }
+        if (!newCatName) return alert("Please enter a name for the new category.");
         category = newCatName.toLowerCase().replace(/[^a-z0-9]/g, '_');
       }
 
@@ -649,7 +793,6 @@
       customMacros.push(macroObj);
       localStorage.setItem('deck_custom_macros', JSON.stringify(customMacros));
 
-      // Clear Form Inputs
       document.getElementById('macroName').value = '';
       document.getElementById('macroIcon').value = '';
       document.getElementById('macroSequence').value = '';
@@ -662,7 +805,7 @@
     }
 
     function deleteCustomMacro(id, event) {
-      event.stopPropagation(); // Prevent triggering macro click
+      event.stopPropagation();
       if (confirm("Delete this macro tile?")) {
         customMacros = customMacros.filter(m => m.id !== id);
         localStorage.setItem('deck_custom_macros', JSON.stringify(customMacros));
@@ -674,12 +817,10 @@
       const tabBar = document.getElementById('tabBar');
       const categorySelect = document.getElementById('macroCategory');
 
-      // Clear dynamic elements
       document.querySelectorAll('.custom-dynamic-tab').forEach(e => e.remove());
       document.querySelectorAll('.custom-dynamic-container').forEach(e => e.remove());
       document.querySelectorAll('.custom-tile-rendered').forEach(e => e.remove());
 
-      // Reset options in dropdown
       categorySelect.innerHTML = `
         <option value="yt">YouTube</option>
         <option value="key">Keyboard</option>
@@ -691,7 +832,6 @@
         let gridId = `grid-${macro.category}`;
         let gridContainer = document.getElementById(gridId);
 
-        // Render tab/container if target dynamic category doesn't exist yet
         if (!gridContainer) {
           const tabBtn = document.createElement('div');
           tabBtn.className = 'tab-btn custom-dynamic-tab';
@@ -713,7 +853,6 @@
           gridContainer = document.getElementById(gridId);
         }
 
-        // Render Macro Tile with Delete Button
         const tile = document.createElement('div');
         tile.className = 'deck-tile tile-custom custom-tile-rendered';
         tile.onclick = () => executeSequence(macro.steps);
@@ -751,43 +890,31 @@
       const dx = touch.clientX - lastX;
       const dy = touch.clientY - lastY;
 
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-        isMoving = true;
-      }
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) isMoving = true;
 
       lastX = touch.clientX;
       lastY = touch.clientY;
 
-      if (e.touches.length === 1) {
-        send({ type: 'mouse_move', dx: dx, dy: dy });
-      }
+      if (e.touches.length === 1) send({ type: 'mouse_move', dx: dx, dy: dy });
     }, { passive: true });
 
     pad.addEventListener('touchend', (e) => {
       const touchDuration = Date.now() - touchStartTime;
-
       if (e.touches.length === 0) {
         if (!isMoving && touchDuration < 300) {
-          if (maxFingersSeen >= 2) {
-            sendClick('right');
-          } else {
-            sendClick('left');
-          }
+          if (maxFingersSeen >= 2) sendClick('right');
+          else sendClick('left');
         }
         maxFingersSeen = 0;
       }
     });
 
-    // Dedicated Side Scroll Strip Handling
     let lastScrollY = 0;
-    scrollPad.addEventListener('touchstart', (e) => {
-      lastScrollY = e.touches[0].clientY;
-    }, { passive: true });
+    scrollPad.addEventListener('touchstart', (e) => { lastScrollY = e.touches[0].clientY; }, { passive: true });
 
     scrollPad.addEventListener('touchmove', (e) => {
       const currentY = e.touches[0].clientY;
       const deltaY = lastScrollY - currentY;
-      
       if (Math.abs(deltaY) > 2) {
         send({ type: 'mouse_scroll', amount: Math.round(deltaY * 5) });
         lastScrollY = currentY;

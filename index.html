@@ -361,7 +361,6 @@
 </head>
 <body>
 
-  <!-- Auth PIN Prompt Modal -->
   <div id="authModal" class="auth-overlay" style="display: none;">
     <div class="auth-box">
       <h3 style="color: var(--text-main);">Security Pair</h3>
@@ -371,14 +370,12 @@
     </div>
   </div>
 
-  <!-- Connection Header -->
   <div class="header">
     <div id="statusDot" class="status-dot"></div>
     <input type="text" id="serverIp" placeholder="PC IP Address (e.g. 192.168.1.5)">
     <button class="btn-connect" onclick="connectWS()">Connect</button>
   </div>
 
-  <!-- Deck Navigation Tabs -->
   <div class="tab-bar" id="tabBar">
     <div class="tab-btn active" onclick="switchTab('yt-deck', this)">YouTube</div>
     <div class="tab-btn" onclick="switchTab('key-deck', this)">Keyboard</div>
@@ -387,12 +384,15 @@
     <div class="tab-btn" style="color: var(--accent-orange);" onclick="switchTab('add-deck', this)">+ Add</div>
   </div>
 
-  <!-- TAB 1: YOUTUBE CONTROLS -->
   <div id="yt-deck" class="deck-container active">
     <div class="deck-grid" id="grid-yt">
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_play_pause')">
         <span class="icon">⏯</span>
         <span class="label">Play / Pause</span>
+      </div>
+      <div class="deck-tile tile-yt" onclick="sendMacro('yt_next_song')">
+        <span class="icon">⏭</span>
+        <span class="label">Next Song</span>
       </div>
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_back_10')">
         <span class="icon">⏪</span>
@@ -401,14 +401,6 @@
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_fwd_10')">
         <span class="icon">⏩</span>
         <span class="label">+10 Sec</span>
-      </div>
-      <div class="deck-tile tile-yt" onclick="sendMacro('yt_next')">
-        <span class="icon">⏭️</span>
-        <span class="label">Next</span>
-      </div>
-      <div class="deck-tile tile-mode" onclick="sendMacro('yt_fullscreen')">
-        <span class="icon">⛶</span>
-        <span class="label">Fullscreen</span>
       </div>
 
       <div class="deck-tile tile-yt" onclick="sendMacro('yt_seek_back_5')">
@@ -436,18 +428,17 @@
         <span class="icon">🚀</span>
         <span class="label">Speed +</span>
       </div>
+      <div class="deck-tile tile-mode" onclick="sendMacro('yt_fullscreen')">
+        <span class="icon">⛶</span>
+        <span class="label">Fullscreen</span>
+      </div>
       <div class="deck-tile tile-mode" onclick="sendMacro('yt_theater')">
         <span class="icon">🎬</span>
         <span class="label">Theater</span>
       </div>
-      <div class="deck-tile tile-mode" onclick="sendMacro('yt_captions')">
-        <span class="icon">💬</span>
-        <span class="label">Captions</span>
-      </div>
     </div>
   </div>
 
-  <!-- TAB 2: KEYBOARD & HOTKEY DECK -->
   <div id="key-deck" class="deck-container">
     <div class="text-input-group">
       <input type="text" id="keyboardText" placeholder="Type text here & press Send...">
@@ -491,7 +482,6 @@
     </div>
   </div>
 
-  <!-- TAB 3: SHORTS & REELS DECK -->
   <div id="reels-deck" class="deck-container">
     <div class="deck-grid" id="grid-reels">
       <div class="deck-tile tile-mode" onclick="sendMacro('reels_prev')">
@@ -513,21 +503,17 @@
     </div>
   </div>
 
-  <!-- TAB 4: TRACKPAD WITH INTEGRATED REMOTE BUTTONS -->
   <div id="mouse-deck" class="deck-container">
     <div style="display: flex; gap: 8px; flex: 1; width: 100%; min-height: 0;">
-      <!-- Touchpad Surface -->
       <div id="touchpad">
         <span>Slide finger to move mouse</span>
         <span style="font-size: 0.7rem; color: #8b949e; margin-top: 4px;">1 Finger Tap = Left Click<br>2 Finger Tap = Right Click</span>
       </div>
-      <!-- Scroll Strip -->
       <div id="scrollpad" style="width: 42px; background: #090d11; border: 1px solid var(--card-border); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-sub); font-size: 0.8rem; touch-action: none;">
         ⇕
       </div>
     </div>
     
-    <!-- Left Click, Right Click & Up/Down Remote Controls -->
     <div class="mouse-remote-grid">
       <button class="btn-mouse" style="height: 100%;" onclick="sendClick('left')">Left Click</button>
       <button class="btn-mouse" style="height: 100%;" onclick="sendClick('right')">Right Click</button>
@@ -538,7 +524,6 @@
     </div>
   </div>
 
-  <!-- TAB 5: ADVANCED MULTI-STEP MACRO BUILDER -->
   <div id="add-deck" class="deck-container">
     <div class="macro-form">
       <h3 style="font-size: 0.95rem; color: var(--text-main);">Custom Macro Builder</h3>
@@ -581,7 +566,6 @@
     window.onload = () => {
       renderCustomMacros();
       
-      // Extract IP and PIN from URL if scanned from QR Code
       const params = new URLSearchParams(window.location.search);
       const urlIp = params.get('ip');
       autoPin = params.get('pin');
@@ -589,7 +573,6 @@
       if (urlIp) document.getElementById('serverIp').value = urlIp;
       if (autoPin) document.getElementById('pinInput').value = autoPin;
 
-      // Auto-connect if URL parameters exist
       if (urlIp) {
         connectWS();
       }
@@ -602,7 +585,6 @@
         return;
       }
 
-      // If NO saved token AND NO auto PIN from QR code, demand PIN modal immediately
       if (!sessionToken && !autoPin) {
         document.getElementById('authModal').style.display = 'flex';
         return;
@@ -613,11 +595,9 @@
       ws = new WebSocket(`ws://${ip}:8765`);
 
       ws.onopen = () => {
-        // Attempt token authentication if available
         if (sessionToken) {
           ws.send(JSON.stringify({ type: 'authenticate', token: sessionToken }));
         } else if (autoPin) {
-          // Fallback to QR code PIN
           ws.send(JSON.stringify({ type: 'authenticate', pin: autoPin }));
           autoPin = null;
         }
@@ -632,7 +612,6 @@
             document.getElementById('statusDot').classList.add('connected');
             document.getElementById('authModal').style.display = 'none';
 
-            // Clean up address bar params
             window.history.replaceState({}, document.title, window.location.pathname);
 
             clearInterval(pingInterval);
@@ -642,7 +621,6 @@
               }
             }, 10000);
           } else {
-            // Authentication failed: Clear invalid token and demand PIN entry modal
             sessionToken = '';
             localStorage.removeItem('deck_session_token');
             document.getElementById('statusDot').classList.remove('connected');
@@ -675,7 +653,6 @@
         return;
       }
 
-      // Ensure connection is established before transmitting PIN
       if (!ws || ws.readyState !== WebSocket.OPEN) {
         ws = new WebSocket(`ws://${ip}:8765`);
         ws.onopen = () => {
